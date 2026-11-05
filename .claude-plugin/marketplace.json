@@ -1,0 +1,12 @@
+{
+  "name": "ljkart",
+  "description": "Claude Code plugins by ljkart.",
+  "owner": { "name": "Liju Kunnummal" },
+  "plugins": [
+    {
+      "name": "masna",
+      "source": "./plugins/masna",
+      "description": "Turns a queue of GitHub issues into reviewed code."
+    }
+  ]
+}
