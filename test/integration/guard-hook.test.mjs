@@ -61,6 +61,21 @@ test('reviewers, including custom ones, write only their own file', () => {
   assert.equal(own.status, 0);
 });
 
+test('only the UI and UX reviewers can save screens, in their job\'s folder', () => {
+  const save = (agent_type) => call({
+    agent_type,
+    tool_name: 'Write',
+    tool_input: { file_path: join(project.jobFolder(1), 'screens/home.png') },
+  }).status;
+  assert.equal(save('masna:reviewer-ui'), 0);
+  assert.equal(save('masna:reviewer-ux'), 0);
+  assert.equal(save('masna:reviewer-code'), 2);
+  assert.equal(save('masna:reviewer-security'), 2);
+  assert.equal(save('masna:approver'), 2);
+  assert.equal(save('masna:builder'), 2);
+  assert.equal(save('house-style'), 2);
+});
+
 test('MCP tools are blocked for Masna\'s agents', () => {
   const result = call({ agent_type: 'masna:builder', tool_name: 'mcp__github__merge_pull_request', tool_input: {} });
   assert.equal(result.status, 2);

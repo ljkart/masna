@@ -38,7 +38,7 @@ The engine reads only these fields, and treats anything else as a missing file. 
 | `approver` | `decision.md` | `DECISION: APPROVE`, `REJECT` or `DECISION-NEEDED`, and `COMMIT: <sha>` |
 | `finisher` | `group.md` | `STATUS: READY` or `STATUS: BLOCKED`, and `COMMIT: <sha>` |
 
-The engine passes each agent its paths in the prompt, in this form: `Job: 12. Job folder: <path>. Worktree: <path>. Round: 2. Commit: <sha>. Base: <branch>. Output: <path>.` A new builder finds the last round's work in `build.previous.md`, and reviewer findings in `review-*.md`.
+The engine passes each agent its paths in the prompt, in this form: `Job: 12. Job folder: <path>. Worktree: <path>. Round: 2. Commit: <sha>. Base: <branch>. Output: <path>.` A new builder finds the last round's work in `build.previous.md`, reviewer findings in `review-*.md`, the last gate result in `checks.md`, and the operator's words in `feedback.md`.
 
 ### Decisions made while building
 
@@ -54,3 +54,19 @@ The engine passes each agent its paths in the prompt, in this form: `Job: 12. Jo
 The integration tests use real git, a fake `gh` and scripted agents. To check they can fail, 18 deliberate breaks were made in the engine, each in its own copy, such as a guard that fails open or a landing that ignores its earlier commit. The tests caught all 18.
 
 Against the real GitHub API, only read calls have been tried: milestones, issue and PR lists, permissions and the GraphQL query. Calls that change GitHub are first used for real in M2's sandbox run.
+
+## M2: agents and skills
+
+### Decisions made while building
+
+- **Screens:** `reviewer-ui` and `reviewer-ux` run `npx playwright screenshot` and save to `<job folder>/screens/`, the one place besides their output file that the guard lets them write. Other reviewers, and custom ones, stay limited to their own file. The guard can't see where `npx` writes, so this location is a convention for that command and a rule for everything else.
+- **Following `cd`:** an agent's Bash calls don't keep their folder, so most start with `cd <worktree> &&`. The guard now follows a `cd` within a command, because it resolved later writes against the session's folder before. That wrongly blocked `cd <worktree> && mkdir src/x`, and it let `cd .claude && echo x > settings.json` through from inside a worktree. A `cd` it can't follow, such as `cd "$X"`, blocks later writes by agents.
+- **Builder's base:** the builder's prompt now names `Base`, so it can find earlier rounds' commits with `git log <Base>..HEAD`.
+- **Reopened issues:** the builder's instructions name `feedback.md`, so feedback on a reopened issue reaches it, though its prompt only names `issue.md`.
+- **Rules are for reviewers:** the builder isn't pointed at `.masna/rules/`. The sandbox uses this to force a fix round: a house rule that only the reviewer knows. M6 can show whether builders should read them too, to save rounds.
+
+### The sandbox
+
+`test/sandbox/create.sh <folder>` builds `ljkart/masna-sandbox` from `test/sandbox/project/` and `test/sandbox/issues/`: three dependent issues routed to all four reviewers, the two labels, and a hand-written `.masna/`, because `/masna:init` is M4. It refuses to touch a repo that already exists.
+
+`node test/sandbox/smoke.mjs <owner/repo>` drives the engine against the real GitHub API with scripted agents and no model calls, then removes what it created. It takes a stuck issue through a partial PR, feedback and an edit of that PR. It passed on 2026-11-05, the first real use of the calls that change GitHub.

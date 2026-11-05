@@ -1,0 +1,8 @@
+node_modules/
+.DS_Store
+.masna/jobs/
+.masna/worktrees/
+.masna/run.json
+.masna/events*.jsonl
+.masna/queue.json
+.masna/dashboard.json

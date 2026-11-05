@@ -6,7 +6,7 @@ This plan stands on its own, so a new session can build from it without other co
 
 - **Repo:** `ljkart/masna`, public
 - **Licence:** MIT
-- **Status:** M0 and M1 are built; the agents and skills (M2) are next
+- **Status:** M0 and M1 are built; the agents and skills (M2) are written and waiting on their real sandbox run
 
 ## 1. Goals
 
@@ -312,7 +312,7 @@ Plugin agents ignore `hooks` and `permissionMode` in their frontmatter, so the g
 | Everyone | Pushing the base branch, `gh pr merge`, force pushes, and commands listed in `blocked_commands` |
 | Everyone | Writing to paths in `never_touch` |
 | Builder | Writing to `protected_paths`, or outside its worktree and `build.md` |
-| Reviewers, approver, finisher | Writing anything except their own output file |
+| Reviewers, approver, finisher | Writing anything except their own output file. `reviewer-ui` and `reviewer-ux` can also write in the job's `screens/` folder |
 
 Agents also get a `tools` list in their frontmatter, so reviewers have no `Edit` tool. Without one, a background agent gets `Agent`, `SendMessage`, `WebFetch` and `WebSearch` too (spike S3), and a builder misled by issue text could use those to send data out.
 
@@ -553,8 +553,5 @@ Made:
 
 1. **Licence:** MIT.
 2. **Repo:** `ljkart/masna` is public and created.
-
-Still needed:
-
-3. **Sandbox repo for M2:** a small throwaway, public or private, to create when M2 starts.
-4. **How `reviewer-ui` sees screens:** plugin agents can't declare MCP servers, and the guard blocks MCP tools. The proposed answer is a browser CLI run through Bash, such as `npx playwright screenshot`, with the images read back from the job folder.
+3. **Sandbox repo for M2:** `ljkart/masna-sandbox`, private and disposable, built by `test/sandbox/create.sh`.
+4. **How `reviewer-ui` and `reviewer-ux` see screens:** plugin agents can't declare MCP servers, and the guard blocks MCP tools, so they run `npx playwright screenshot` through Bash and read the images back from the job's `screens/` folder.

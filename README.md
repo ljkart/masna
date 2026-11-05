@@ -2,7 +2,7 @@
 
 Masna (Arabic for "factory") is a Claude Code plugin that turns a queue of GitHub issues into reviewed code. It takes one issue at a time, builds it, runs the project's checks, reviews it from several angles in parallel, fixes what the reviewers find, and moves on until the queue is empty.
 
-**Status: not ready to use.** The engine is built and tested without any model calls, but the agents and skills that use it aren't written yet. See [the build plan](docs/PLAN.md) and [the recorded design answers](docs/DESIGN.md).
+**Status: not ready to use.** The engine, agents and `/masna:run`, `/masna:status` and `/masna:feedback` are written, but they haven't yet finished a real run, and `/masna:init` doesn't exist yet. See [the build plan](docs/PLAN.md) and [the recorded design answers](docs/DESIGN.md).
 
 ## Install
 

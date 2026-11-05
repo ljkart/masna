@@ -1,0 +1,24 @@
+{
+  "base_branch": "main",
+  "queue_label": "ready-for-agent",
+  "needs_human_label": "masna:needs-human",
+  "pause_after_group": true,
+  "max_rounds": 3,
+  "max_gate_fixes": 3,
+  "gate_timeout_minutes": 10,
+  "agent_timeout_minutes": 30,
+  "reviewers": {
+    "api/**": ["code", "security"],
+    "web/**": ["code", "ui", "ux"],
+    "**": ["code"]
+  },
+  "models": {
+    "builder": "sonnet",
+    "code": "sonnet",
+    "security": "sonnet",
+    "ui": "sonnet",
+    "ux": "sonnet",
+    "approver": "sonnet",
+    "finisher": "sonnet"
+  }
+}

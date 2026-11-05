@@ -241,7 +241,7 @@ async function advanceBuild(ctx, job, group) {
       ctx,
       job,
       group,
-      `Work file: ${issueFile}. Output: ${join(folder, 'build.md')}.`,
+      `Base: ${group.branch}. Work file: ${issueFile}. Output: ${join(folder, 'build.md')}.`,
     ))],
     report: `${jobLabel(job)}: building, round ${job.round}`,
   };

@@ -159,6 +159,46 @@ test('reviewers and the finisher write only their own output file', () => {
   assert.equal(write(join(worktree, 'a.ts'), finisher).allow, false);
 });
 
+test('a reviewer given a screens folder can write there, and only there', () => {
+  const screens = join(jobFolder, 'screens');
+  const ui = { kind: 'reviewer', short: 'reviewer-ui', ownFile: join(jobFolder, 'review-ui.md'), screens };
+  assert.equal(write(join(screens, 'home.png'), ui).allow, true);
+  assert.equal(bash(`mkdir -p ${screens}`, ui).allow, true);
+  assert.equal(write(join(jobFolder, 'screens-other/home.png'), ui).allow, false);
+  assert.equal(write(join(screens, '../decision.md'), ui).allow, false);
+  assert.equal(write(join(worktree, 'src/a.ts'), ui).allow, false);
+  assert.equal(write(join(screens, 'home.png'), reviewer).allow, false);
+});
+
+test('a screens folder that links elsewhere leads nowhere', () => {
+  const screens = join(jobFolder, 'screens-link');
+  symlinkSync(worktree, screens);
+  const ui = { kind: 'reviewer', short: 'reviewer-ui', ownFile: join(jobFolder, 'review-ui.md'), screens };
+  assert.equal(write(join(screens, 'a.ts'), ui).allow, false);
+});
+
+test('a cd earlier in the command decides where later writes land', () => {
+  const fromRoot = (command, agent = builder) => decide({
+    toolName: 'Bash', toolInput: { command }, cwd: root, context: context(agent),
+  });
+  assert.equal(fromRoot(`cd ${worktree} && mkdir -p src/a`).allow, true);
+  assert.equal(fromRoot(`cd ${worktree} && echo x > src/a.ts`).allow, true);
+  assert.equal(fromRoot(`cd ${worktree}; cd src; rm old.ts`).allow, true);
+  assert.equal(fromRoot(`cd ${worktree} && echo x > CLAUDE.md`).allow, false);
+  assert.equal(fromRoot(`cd ${worktree} && cd .claude && echo x > settings.json`).allow, false);
+  assert.equal(fromRoot(`cd ${worktree} && echo x > ../outside.txt`).allow, false);
+  assert.equal(bash('cd .claude && echo x > settings.json', builder).allow, false);
+  assert.equal(fromRoot(`cd ${jobFolder} && echo x > review-code.md`, reviewer).allow, true);
+  assert.equal(fromRoot(`cd ${jobFolder} && echo x > decision.md`, reviewer).allow, false);
+});
+
+test('a cd the guard can\'t follow blocks later writes by agents', () => {
+  for (const command of ['cd "$WHERE" && echo x > a.ts', 'cd ~ && echo x > a.ts', 'cd && echo x > a.ts', 'cd - && echo x > a.ts']) {
+    assert.equal(bash(command, builder).allow, false, command);
+  }
+  assert.equal(bash('cd "$WHERE" && git status', builder).allow, true);
+});
+
 test('MCP tools are blocked for Masna\'s agents only', () => {
   const call = (agent) => decide({ toolName: 'mcp__github__merge_pull_request', toolInput: {}, cwd: worktree, context: context(agent) });
   assert.equal(call(builder).allow, false);

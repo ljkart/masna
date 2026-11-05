@@ -11,6 +11,7 @@ import { simpleCommands, writeTargets } from './shell.mjs';
 
 const FILE_TOOLS = { Edit: 'file_path', Write: 'file_path', NotebookEdit: 'notebook_path' };
 const SAFE_DEVICES = new Set(['/dev/null', '/dev/stdout', '/dev/stderr']);
+const SEES_SCREENS = ['masna:reviewer-ui', 'masna:reviewer-ux'];
 const FORCE_FLAGS = /^(-f|--force|--force-with-lease.*|--force-if-includes|--mirror)$/;
 
 const allow = { allow: true };
@@ -107,14 +108,24 @@ function pathProblem(path, context) {
     if (matchesAny(config.protected_paths, rel)) return `${rel} is a protected path`;
     return null;
   }
+  if (agent.screens && isInside(agent.screens, path)) return null;
   if (path !== agent.ownFile) return `${agent.short} can only write its own output file`;
   return root ? null : 'no project';
 }
 
 function resolveTarget(target, cwd) {
+  if (cwd === null) return null;
   if (target.includes('$') || target.includes('`') || target.includes('*')) return null;
   const expanded = target.startsWith('~') ? null : target;
   return expanded === null ? null : realPath(resolve(cwd, expanded));
+}
+
+// Where a command leaves the shell, or null if a pattern check can't tell. Agents'
+// Bash calls don't keep their folder, so most of them start with a cd.
+function folderAfter(command, cwd) {
+  if (command.name !== 'cd') return cwd;
+  const target = command.words.slice(1).filter((word) => !word.startsWith('-')).pop();
+  return target === undefined ? null : resolveTarget(target, cwd);
 }
 
 // Decides one tool call. Pure apart from reading the file system for real paths.
@@ -137,11 +148,12 @@ export function decide({ toolName, toolInput, cwd, context }) {
     for (const entry of config.blocked_commands) {
       if (text.includes(entry)) return block(`"${entry}" is in blocked_commands`);
     }
+    let folder = cwd;
     for (const command of simpleCommands(text)) {
       const problem = commandProblem(command, context);
       if (problem) return block(problem);
       for (const target of writeTargets(command)) {
-        const path = resolveTarget(target, cwd);
+        const path = resolveTarget(target, folder);
         if (path === null) {
           if (agent) return block(`can't tell where "${target}" points`);
         } else {
@@ -149,6 +161,7 @@ export function decide({ toolName, toolInput, cwd, context }) {
           if (pathIssue) return block(pathIssue);
         }
       }
+      folder = folderAfter(command, folder);
     }
   }
   return allow;
@@ -179,6 +192,7 @@ function describeAgent(agentType, root, config, run) {
     kind: short === 'approver' || short === 'finisher' ? short : 'reviewer',
     short,
     ownFile: folder ? join(folder, fileName) : null,
+    screens: folder && SEES_SCREENS.includes(agentType) ? join(folder, 'screens') : null,
   };
 }
 
