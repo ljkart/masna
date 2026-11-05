@@ -1,6 +1,7 @@
-import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { nowIso } from './fsutil.mjs';
+import { parseBuild, parseDecision, parseGroup, parseVerdict } from './output.mjs';
 
 const markerFile = (folder, short, kind) => join(folder, 'agents', `${short}.${kind}`);
 
@@ -13,6 +14,25 @@ export const hasMarker = (folder, short, kind) => existsSync(markerFile(folder, 
 
 function clearMarkers(folder, short) {
   for (const kind of ['started', 'ended', 'failed']) rmSync(markerFile(folder, short, kind), { force: true });
+}
+
+// The one file each agent owes the engine, and the parser that says it's usable.
+export function agentOutput(short) {
+  if (short === 'builder') return { file: 'build.md', parse: parseBuild };
+  if (short === 'approver') return { file: 'decision.md', parse: parseDecision };
+  if (short === 'finisher') return { file: 'group.md', parse: parseGroup };
+  return { file: `review-${short.replace(/^reviewer-/, '')}.md`, parse: parseVerdict };
+}
+
+// Why an agent ending now would leave the engine nothing to read, or null. A file
+// older than the agent's start marker was left by an earlier round.
+export function outputProblem(folder, short) {
+  const { file, parse } = agentOutput(short);
+  const path = join(folder, file);
+  const started = markerFile(folder, short, 'started');
+  const stale = existsSync(path) && existsSync(started) && statSync(path).mtimeMs < statSync(started).mtimeMs;
+  if (existsSync(path) && !stale && parse(readFileSync(path, 'utf8'))) return null;
+  return `Masna reads only ${path}, and your reply goes nowhere. That file needs writing, with the first lines exactly as your instructions show, before you stop.`;
 }
 
 // What to do about an agent whose output isn't valid yet. Returns one of:

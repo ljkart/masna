@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { agents, issue, landedOnGroup, Orchestrator, Project } from '../helpers/project.mjs';
@@ -196,6 +196,29 @@ test('prompts, reports and PR text never contain issue text', () => {
   // Agents get it only through issue.md, as quoted data.
   const data = readFileSync(join(project.jobFolder(1), 'issue.md'), 'utf8');
   assert.match(data, new RegExp(`^> - ${secret}$`, 'm'));
+  project.cleanup();
+});
+
+// In the first real run, a reviewer's only look for the rules was in a command that
+// got denied, so a rule went unchecked and the issue landed breaking it.
+test('a reviewer\'s prompt names its rules file, when the project has one', () => {
+  const project = new Project({ issues: [issue(1)], config: { reviewers: { '**': ['code', 'security'] } } });
+  mkdirSync(join(project.root, '.masna/rules'), { recursive: true });
+  writeFileSync(join(project.root, '.masna/rules/code.md'), 'Start every file with a header.\n');
+  project.git(['add', '-A']);
+  project.git(['commit', '--quiet', '-m', 'Add a rule']);
+  project.git(['push', '--quiet', 'origin', 'main']);
+
+  const orchestrator = new Orchestrator(project);
+  orchestrator.begin();
+  orchestrator.drive();
+  const prompt = (type) => orchestrator.actions
+    .flatMap((step) => step.agents ?? [])
+    .find((agent) => agent.type === type).prompt;
+  const worktree = join(project.root, project.group(1).worktree);
+  assert.ok(prompt('masna:reviewer-code').includes(` Rules: ${join(worktree, '.masna/rules/code.md')}.`));
+  assert.ok(!prompt('masna:reviewer-security').includes('Rules:'));
+  assert.ok(!prompt('masna:builder').includes('Rules:'));
   project.cleanup();
 });
 

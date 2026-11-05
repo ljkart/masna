@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -143,6 +143,72 @@ test('a project without Masna, or outside git, is left alone', () => {
 test('the hooks that record agents never fail, even with bad input', () => {
   assert.equal(project.masnaRaw(['agent-ended'], 'not json').status, 0);
   assert.equal(project.masnaRaw(['agent-started'], '{}').status, 0);
+});
+
+// In the first real run, two reviewers put their review in their reply and stopped.
+// These need a job still active, which an earlier takeover in this file has cleared.
+function withActiveJob(body) {
+  const own = new Project({ issues: [issue(1)] });
+  const orchestrator = new Orchestrator(own, { 1: { builder: () => 'crash' } });
+  orchestrator.begin();
+  orchestrator.drive();
+  const cwd = join(own.root, own.group(1).worktree);
+  const hook = (kind, extra = {}) => own.masnaRaw(
+    [kind],
+    JSON.stringify({ cwd, agent_type: 'masna:reviewer-code', ...extra }),
+    cwd,
+  );
+  body({ folder: own.jobFolder(1), hook });
+  own.cleanup();
+}
+
+test('an agent that stops without its output is sent back once', () => {
+  withActiveJob(({ folder, hook }) => {
+    const output = join(folder, 'review-code.md');
+    const ended = join(folder, 'agents/reviewer-code.ended');
+    hook('agent-started');
+
+    const first = hook('agent-ended');
+    assert.equal(first.status, 0);
+    const reply = JSON.parse(first.stdout);
+    assert.equal(reply.decision, 'block');
+    assert.ok(reply.reason.includes(output));
+    assert.equal(existsSync(ended), false);
+
+    // A file with no usable header is no better than none.
+    writeFileSync(output, 'It looks fine to me.\n');
+    assert.equal(JSON.parse(hook('agent-ended').stdout).decision, 'block');
+
+    // The second stop is let through, or an agent that can't write would never end.
+    assert.equal(hook('agent-ended', { stop_hook_active: true }).stdout, '');
+    assert.equal(existsSync(ended), true);
+  });
+});
+
+test('an agent that wrote valid output stops without being sent back', () => {
+  withActiveJob(({ folder, hook }) => {
+    hook('agent-started');
+    writeFileSync(join(folder, 'review-code.md'), 'VERDICT: PASS\nCOMMIT: abc1234\n');
+    assert.equal(hook('agent-ended').stdout, '');
+    assert.equal(existsSync(join(folder, 'agents/reviewer-code.ended')), true);
+  });
+});
+
+test('output left by an earlier round doesn\'t count as this agent\'s', () => {
+  withActiveJob(({ folder, hook }) => {
+    const output = join(folder, 'review-code.md');
+    writeFileSync(output, 'VERDICT: CHANGES\nCOMMIT: abc1234\n');
+    const earlier = new Date(Date.now() - 60_000);
+    utimesSync(output, earlier, earlier);
+    hook('agent-started');
+    assert.equal(JSON.parse(hook('agent-ended').stdout).decision, 'block');
+  });
+});
+
+test('agents outside Masna are never sent back', () => {
+  withActiveJob(({ hook }) => {
+    assert.equal(hook('agent-ended', { agent_type: 'Explore' }).stdout, '');
+  });
 });
 
 test('a missing library still blocks: the guard survives a broken install', () => {

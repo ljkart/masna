@@ -38,6 +38,16 @@ async function recordAgent(kind) {
 
 const print = (value) => console.log(JSON.stringify(value));
 
+async function agentEnded() {
+  try {
+    const hooks = await library('hooks');
+    const reason = hooks.agentEnded(JSON.parse(readStdin()));
+    if (reason) print({ decision: 'block', reason });
+  } catch {
+    // Deliberately ignored, as in recordAgent.
+  }
+}
+
 async function root() {
   const { findRoot } = await library('project');
   return findRoot();
@@ -93,7 +103,7 @@ const commands = {
 
   guard,
   'agent-started': () => recordAgent('started'),
-  'agent-ended': () => recordAgent('ended'),
+  'agent-ended': agentEnded,
 };
 
 const [command, ...args] = process.argv.slice(2);

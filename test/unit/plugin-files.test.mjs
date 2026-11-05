@@ -68,12 +68,22 @@ test('the builder is pointed at everything a reopened job leaves behind', () => 
   }
 });
 
-// Claude Code denies any one command holding both, however the allow rules read.
-test('no agent is told to combine cd and git', () => {
+// Claude Code refuses cd beside git, `..` or a write, however the allow rules read.
+test('agents are told to work without cd, and why a refusal isn\'t the end of Bash', () => {
   for (const name of AGENTS) {
     const { text } = agent(name);
     assert.equal(/`cd [^`]*&&[^`]*\bgit\b/.test(text), false, name);
     assert.ok(text.includes('git -C <Worktree>'), name);
+    assert.ok(text.includes('absolute paths'), name);
+    assert.match(text, /only that one call was refused/, name);
+  }
+});
+
+test('each reviewer reads the rules file its prompt names', () => {
+  for (const name of REVIEWERS) {
+    const { text } = agent(name);
+    assert.ok(text.includes('`Rules`'), name);
+    assert.equal(text.includes('.masna/rules/'), false, name);
   }
 });
 

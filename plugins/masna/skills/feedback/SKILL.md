@@ -1,5 +1,5 @@
 ---
-description: Send a stuck issue or an open group PR back for more work.
+description: Send a stuck issue, a group the finisher blocked, or an open group PR back for more work.
 disable-model-invocation: true
 argument-hint: <issue or PR number> <what to change>
 allowed-tools: Bash(masna feedback *)

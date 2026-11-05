@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import { hasMarker, writeMarker } from './agents.mjs';
+import { hasMarker, outputProblem, writeMarker } from './agents.mjs';
 import { customReviewers, readLocalConfig } from './config.mjs';
 import { logEvent } from './events.mjs';
 import { findRoot, jobsDir } from './project.mjs';
@@ -26,4 +26,27 @@ export function recordAgent(input, kind) {
   writeMarker(folder, short, kind);
   touchRun(root);
   logEvent(root, 'agent', { run: run.id, job: run.active, agent: short, state: kind });
+}
+
+function stopProblem(input) {
+  if (input.stop_hook_active) return null;
+  const root = findRoot(input.cwd ?? process.cwd());
+  const config = readLocalConfig(root);
+  const short = config && shortName(input.agent_type, config);
+  const run = readRun(root);
+  return short && run?.active ? outputProblem(join(jobsDir(root), run.active), short) : null;
+}
+
+// Handles an agent stopping. Returns the reason to send it back, or null once it can
+// end. The second stop always ends it, or an agent that can't write would never stop.
+export function agentEnded(input) {
+  let problem = null;
+  try {
+    problem = stopProblem(input);
+  } catch {
+    // Deliberately ignored: a failure here must not trap the agent.
+  }
+  if (problem) return problem;
+  recordAgent(input, 'ended');
+  return null;
 }

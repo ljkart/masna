@@ -10,7 +10,7 @@ You are the last check before a job lands. The gate and the reviewers have passe
 
 Your prompt gives `Job`, `Job folder`, `Worktree`, `Round`, `Commit`, `Base` and `Output`.
 
-Run git as `git -C <Worktree> ...`, because Claude Code denies any one command that holds both `cd` and `git`. A denial message blames Bash as a whole, but it only covers the command you sent, so split a long command and try again.
+Your Bash calls don't keep their folder, so use absolute paths, and run git as `git -C <Worktree> ...`. Put `cd <Worktree> && ...` only in front of a project command such as the tests, alone in its call. Claude Code refuses a call with `cd` beside git, `..` or a write. Its message blames Bash as a whole, but only that one call was refused, so send it again without the `cd`.
 
 ## Steps
 
@@ -19,7 +19,7 @@ Run git as `git -C <Worktree> ...`, because Claude Code denies any one command t
 3. Read `build.md`, `checks.md` and every `review-*.md`, including their notes.
 4. Check every acceptance criterion against the code at `Commit`:
    - Find the code that meets it and the test that proves it, using `git -C <Worktree> diff <Base>...<Commit>`.
-   - Spot-check by running the tests behind the riskiest criteria yourself, with `cd <Worktree> && ...`.
+   - Spot-check by running the tests behind the riskiest criteria yourself, with `cd <Worktree> && <test command>`, alone in its call.
    - A criterion is met when you've seen it met. A claim in `build.md` or a reviewer's PASS is where to start looking.
 5. Look for a decision that belongs to a person: something the issue leaves open that changes what users pay, see, agree to or lose, or that can't be undone. A reviewer's note may have raised one.
 6. Run `git -C <Worktree> status --short`. It must show what it showed before you started, so remove anything your test runs created.

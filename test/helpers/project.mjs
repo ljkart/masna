@@ -247,7 +247,12 @@ export class Orchestrator {
       this.pendingFailed.push(agent.type);
       return 'failed';
     }
-    hook('agent-ended');
+    // An agent told to go back and write its output, that still doesn't, stops again.
+    const reply = this.project.masna(['agent-ended'], JSON.stringify({ agent_type: agent.type, cwd: info.worktree }));
+    if (reply.includes('"block"')) {
+      this.sentBack = (this.sentBack ?? 0) + 1;
+      this.project.masna(['agent-ended'], JSON.stringify({ agent_type: agent.type, cwd: info.worktree, stop_hook_active: true }));
+    }
     return outcome;
   }
 

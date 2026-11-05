@@ -79,6 +79,21 @@ The builder was denied Bash on its first command and stopped as blocked. Tested 
 
 So any one command holding both `cd` and `git` is denied, whatever the allow rules say, and the message blames Bash as a whole. The builder's instructions had told it to start every command with `cd`. Agents now use `git -C <Worktree>`, and a test keeps it that way. They also split a denied command and try again before reporting it as blocked. Don't answer this with a blanket `Bash` allow rule: `/masna:init` should keep proposing narrow rules.
 
+### What the second real run found
+
+All three issues landed, with #1 taking the forced fix round, and then the finisher blocked the group. No PR opened, so this run doesn't meet the exit test. It did confirm S3 and S8 in an interactive session: background agents used `Bash`, `Write` and `Edit` under `dontAsk` with narrow allow rules, and background gate commands woke the orchestrator. S6 is still open, because nobody typed `/compact`.
+
+| What happened | Why | What changed |
+|---|---|---|
+| 20 of 77 agent Bash calls were denied, and two approvers skipped the tests they'd been told to run | Every denied call held `cd`, and none without one was denied. `cd` beside `..` or a write is refused too, not just beside `git`. Instructions alone didn't stop it | The guard refuses those calls for agents and says what to send instead, so an agent no longer reads it as Bash being off. Agents use absolute paths, and `cd` only for a project command alone in its call |
+| #2 landed breaking a project rule | The reviewer's only look for the rules was inside a denied command, and it never tried again | The engine names the rules file in the reviewer's prompt |
+| Two reviewers ended with their review as a reply and no file, which paused the run | Instructions alone again. The pause blamed a possible outage | A `SubagentStop` check sends an agent back once if its output is missing, stale or has no valid header. Tested with a real background plugin agent |
+| The finisher's block had no way out | Feedback on a landed issue pointed at a group PR that didn't exist, and running again read the same result | Feedback on any landed issue in a blocked group becomes a group job. Its commit brings a fresh gate and finisher, then the PR |
+
+The denial data covers one run, and the exact rule inside Claude Code isn't known: one call with `cd` and `../..` was allowed. The guard refuses that shape anyway, which costs an agent one retry.
+
+An agent that ends with no valid output still counts towards the pause meant for outages. The check makes this rare, so that stays as it is until a run shows otherwise.
+
 ### The sandbox
 
 `test/sandbox/create.sh <folder>` builds `ljkart/masna-sandbox` from `test/sandbox/project/` and `test/sandbox/issues/`: three dependent issues routed to all four reviewers, the two labels, and a hand-written `.masna/`, because `/masna:init` is M4. It refuses to touch a repo that already exists.

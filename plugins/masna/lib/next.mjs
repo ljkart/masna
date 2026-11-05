@@ -369,11 +369,13 @@ async function advanceReview(ctx, job, group) {
     action: 'spawn',
     agents: toStart.map(({ name, agent }) => {
       const screens = ['ui', 'ux'].includes(name) ? ` Preview: ${job.preview?.url ?? 'none'}.` : '';
+      const rulesFile = join(worktree, '.masna', 'rules', `${name}.md`);
+      const rules = existsSync(rulesFile) ? ` Rules: ${rulesFile}.` : '';
       return agentEntry(ctx, agent.type, name, basePrompt(
         ctx,
         job,
         group,
-        `Commit: ${commit}. Base: ${group.branch}. Output: ${join(folder, agent.file)}.${screens}`,
+        `Commit: ${commit}. Base: ${group.branch}. Output: ${join(folder, agent.file)}.${screens}${rules}`,
       ));
     }),
     report: `${jobLabel(job)}: reviewing (${toStart.map(({ name }) => name).join(', ')})`,
@@ -682,7 +684,7 @@ function finishGroup(ctx, group, landed, unresolved) {
     };
   }
   if (finished.status !== 'READY') {
-    throw new PauseError(`group ${group.number}: the finisher says it isn't ready: see its group.md`);
+    throw new PauseError(`group ${group.number}: the finisher says it isn't ready: see its group.md. Send the fix with /masna:feedback and any issue in the group, then run again`);
   }
 
   const pr = openOrUpdatePullRequest(ctx, group, landed, unresolved);

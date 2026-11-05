@@ -33,8 +33,10 @@ function reopenIssueJob(root, job, text) {
 }
 
 function createGroupJob(root, group, text) {
-  const state = new GitHub(root).pullRequestState(group.pr.number);
-  if (state !== 'OPEN') return refuse(`PR #${group.pr.number} is ${state.toLowerCase()}, so it can't take feedback`);
+  if (group.pr) {
+    const state = new GitHub(root).pullRequestState(group.pr.number);
+    if (state !== 'OPEN') return refuse(`PR #${group.pr.number} is ${state.toLowerCase()}, so it can't take feedback`);
+  }
 
   const taken = listJobs(root).filter((job) => job.kind === 'group-feedback' && job.group === group.number).length;
   const id = `g${group.number}-f${taken + 1}`;
@@ -52,7 +54,8 @@ function createGroupJob(root, group, text) {
     created_at: nowIso(),
   });
   logEvent(root, 'stage', { job: id, from: null, to: 'build', feedback: true });
-  return { ok: true, message: `feedback on PR #${group.pr.number} saved as job ${id}, for the next run` };
+  const owner = group.pr ? `PR #${group.pr.number}` : `group ${group.number}`;
+  return { ok: true, message: `feedback on ${owner} saved as job ${id}, for the next run` };
 }
 
 // `target` is an issue number, a group PR number, or a job id such as g1-f1.
@@ -68,7 +71,10 @@ export function giveFeedback(root, target, text) {
   if (!job) return refuse(`no job for #${target}, and it isn't an open group PR`);
   if (job.stage === 'landed') {
     const owner = groups.find((candidate) => candidate.number === job.group);
-    return refuse(`#${target} has landed: send feedback on group PR #${owner?.pr?.number ?? '?'} instead`);
+    if (owner?.pr) return refuse(`#${target} has landed: send feedback on group PR #${owner.pr.number} instead`);
+    // The finisher blocked this group, so no PR will come until the problem is fixed.
+    if (owner?.state === 'finishing') return createGroupJob(root, owner, text);
+    return refuse(`#${target} has landed, and its group has no PR yet: send feedback once it has one`);
   }
   if (ACTIVE_STAGES.includes(job.stage)) return refuse(`#${target} is still being worked on (${job.stage})`);
   if (job.stage !== 'needs-human') return refuse(`#${target} is ${job.stage}`);

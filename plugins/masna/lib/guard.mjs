@@ -1,5 +1,6 @@
 import { existsSync, lstatSync, readlinkSync, realpathSync } from 'node:fs';
 import { dirname, join, relative, resolve, sep } from 'node:path';
+import { agentOutput } from './agents.mjs';
 import { customReviewers, normalizeConfig } from './config.mjs';
 import { logEvent } from './events.mjs';
 import { readJson, readText } from './fsutil.mjs';
@@ -120,12 +121,23 @@ function resolveTarget(target, cwd) {
   return expanded === null ? null : realPath(resolve(cwd, expanded));
 }
 
-// Where a command leaves the shell, or null if a pattern check can't tell. Agents'
-// Bash calls don't keep their folder, so most of them start with a cd.
+// Where a command leaves the shell, or null if a pattern check can't tell.
 function folderAfter(command, cwd) {
   if (command.name !== 'cd') return cwd;
   const target = command.words.slice(1).filter((word) => !word.startsWith('-')).pop();
   return target === undefined ? null : resolveTarget(target, cwd);
+}
+
+// Claude Code refuses these beside a cd, however the allow rules read, and its message
+// blames Bash as a whole. Refusing them here tells the agent what to send instead.
+function cdProblem(commands) {
+  if (!commands.some(({ name }) => name === 'cd')) return null;
+  const refused = commands.filter(({ name }) => name !== 'cd').some((command) => command.name === 'git'
+    || command.words.slice(1).some((word) => /(^|\/)\.\.(\/|$)/.test(word))
+    || writeTargets(command).some((target) => !SAFE_DEVICES.has(target)));
+  return refused
+    ? 'Claude Code refuses a call with cd beside git, .. or a write. Bash still works: send this again with absolute paths and git -C <folder>, and no cd'
+    : null;
 }
 
 // Decides one tool call. Pure apart from reading the file system for real paths.
@@ -148,8 +160,11 @@ export function decide({ toolName, toolInput, cwd, context }) {
     for (const entry of config.blocked_commands) {
       if (text.includes(entry)) return block(`"${entry}" is in blocked_commands`);
     }
+    const commands = simpleCommands(text);
+    const refused = agent ? cdProblem(commands) : null;
+    if (refused) return block(refused);
     let folder = cwd;
-    for (const command of simpleCommands(text)) {
+    for (const command of commands) {
       const problem = commandProblem(command, context);
       if (problem) return block(problem);
       for (const target of writeTargets(command)) {
@@ -186,12 +201,10 @@ function describeAgent(agentType, root, config, run) {
       worktree: group?.worktree ? realPath(join(root, group.worktree)) : null,
     };
   }
-  const fileName = { approver: 'decision.md', finisher: 'group.md' }[short]
-    ?? `review-${short.replace(/^reviewer-/, '')}.md`;
   return {
     kind: short === 'approver' || short === 'finisher' ? short : 'reviewer',
     short,
-    ownFile: folder ? join(folder, fileName) : null,
+    ownFile: folder ? join(folder, agentOutput(short).file) : null,
     screens: folder && SEES_SCREENS.includes(agentType) ? join(folder, 'screens') : null,
   };
 }

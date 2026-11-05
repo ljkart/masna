@@ -177,26 +177,56 @@ test('a screens folder that links elsewhere leads nowhere', () => {
   assert.equal(write(join(screens, 'a.ts'), ui).allow, false);
 });
 
-test('a cd earlier in the command decides where later writes land', () => {
-  const fromRoot = (command, agent = builder) => decide({
-    toolName: 'Bash', toolInput: { command }, cwd: root, context: context(agent),
+test('a cd earlier in the command decides where the main session\'s writes land', () => {
+  const fromRoot = (command) => decide({
+    toolName: 'Bash', toolInput: { command }, cwd: root, context: context(null),
   });
-  assert.equal(fromRoot(`cd ${worktree} && mkdir -p src/a`).allow, true);
-  assert.equal(fromRoot(`cd ${worktree} && echo x > src/a.ts`).allow, true);
-  assert.equal(fromRoot(`cd ${worktree}; cd src; rm old.ts`).allow, true);
-  assert.equal(fromRoot(`cd ${worktree} && echo x > CLAUDE.md`).allow, false);
-  assert.equal(fromRoot(`cd ${worktree} && cd .claude && echo x > settings.json`).allow, false);
-  assert.equal(fromRoot(`cd ${worktree} && echo x > ../outside.txt`).allow, false);
-  assert.equal(bash('cd .claude && echo x > settings.json', builder).allow, false);
-  assert.equal(fromRoot(`cd ${jobFolder} && echo x > review-code.md`, reviewer).allow, true);
-  assert.equal(fromRoot(`cd ${jobFolder} && echo x > decision.md`, reviewer).allow, false);
+  mkdirSync(join(root, 'secrets'), { recursive: true });
+  assert.equal(fromRoot('cd secrets && echo x > a.ts').allow, false);
+  assert.equal(fromRoot('cd secrets; cd ..; echo x > a.ts').allow, true);
+  assert.equal(fromRoot(`cd ${worktree} && echo x > a.ts`).allow, true);
 });
 
-test('a cd the guard can\'t follow blocks later writes by agents', () => {
-  for (const command of ['cd "$WHERE" && echo x > a.ts', 'cd ~ && echo x > a.ts', 'cd && echo x > a.ts', 'cd - && echo x > a.ts']) {
-    assert.equal(bash(command, builder).allow, false, command);
-  }
-  assert.equal(bash('cd "$WHERE" && git status', builder).allow, true);
+// All 20 calls Claude Code denied in the first real run held a cd, and none without
+// one was denied. Its message blames Bash as a whole, so agents gave up on running
+// tests. Refusing the same calls here tells them what to send instead.
+for (const command of [
+  'cd /wt && git status',
+  'cd /wt && npm test 2>&1 | tail -15; git status --short',
+  'cd /wt; git -C /wt diff',
+  'cd /jobs/2 && ls; ls ../../rules 2>/dev/null',
+  'cd /wt && cat ../../rules/*.md',
+  'cd /jobs && ls -a ../',
+  'cd /wt && mkdir -p x',
+  'cd /wt && echo x > src/a.ts',
+  'ls /wt; mkdir -p /jobs/3/screens; cd /jobs/3/screens && npx playwright screenshot http://x y.png',
+]) {
+  test(`an agent is told why it can't send: ${command}`, () => {
+    for (const agent of [builder, reviewer, finisher]) {
+      const decision = bash(command, agent);
+      assert.equal(decision.allow, false);
+      assert.match(decision.reason, /Claude Code refuses a call with cd/);
+      assert.match(decision.reason, /git -C/);
+    }
+  });
+}
+
+for (const command of [
+  `cd ${worktree} && npm test`,
+  `cd ${worktree} && npm test 2>&1 | tail -8`,
+  `cd ${worktree} && npm test 2>/dev/null`,
+  `cd ${jobFolder} && ls && cat a.md b.md 2>/dev/null`,
+  `git -C ${worktree} status --short; ls ${jobFolder}`,
+  'ls ../other',
+  `mkdir -p ${worktree}/src`,
+]) {
+  test(`an agent can send: ${command}`, () => {
+    assert.equal(bash(command, builder).allow, true);
+  });
+}
+
+test('the main session\'s cd calls are left to Claude Code', () => {
+  assert.equal(bash('cd /wt && git status').allow, true);
 });
 
 test('MCP tools are blocked for Masna\'s agents only', () => {

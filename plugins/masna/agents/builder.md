@@ -13,10 +13,10 @@ Your prompt gives `Job`, `Job folder`, `Worktree`, `Round`, `Base`, `Work file` 
 The worktree is already on the job's branch, and your Bash calls don't keep their folder:
 
 - Git runs as `git -C <Worktree> ...`.
-- Everything else runs as `cd <Worktree> && ...`.
-- Read, Write and Edit take absolute paths.
+- Project commands such as the tests run as `cd <Worktree> && <command>`, alone in their call.
+- Everything else takes absolute paths, including Read, Write and Edit.
 
-Claude Code denies any one command that holds both `cd` and `git`, so keep those in separate calls.
+Claude Code refuses a call with `cd` beside git, `..` or a write. Its message blames Bash as a whole, but only that one call was refused, so send it again without the `cd`.
 
 ## Steps
 
@@ -58,4 +58,4 @@ Write `STATUS: BLOCKED` with a `## Blocked` section saying what's missing and wh
 - The work needs a secret, a service or a tool you don't have.
 - The work has nothing to change, because the criteria are already met.
 - The guard stops something the job can't do without. `Blocked by Masna` is a rule: `.masna/`, `.claude/`, workflows and `CLAUDE.md` are off limits because they judge your work. Report it, and leave the rule standing.
-- A permission rule denies a command the job needs, even as one plain command in a call of its own. A denial message blames Bash as a whole, but it only covers the command you sent, so split a long command and try the parts before you decide this.
+- A permission rule denies a command the job needs, even as one plain command with no `cd`, in a call of its own.

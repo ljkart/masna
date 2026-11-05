@@ -163,6 +163,48 @@ test('a finisher that isn\'t ready stops the PR', () => {
   project.cleanup();
 });
 
+test('a group the finisher blocked can be fixed through feedback, and then gets its PR', () => {
+  const project = new Project({ issues: [issue(1), issue(2, { blockedBy: [1] })] });
+  let finishes = 0;
+  const script = {
+    'group-1': {
+      finisher(p, info) {
+        finishes += 1;
+        agents.finisher(p, info, finishes === 1 ? 'BLOCKED' : 'READY');
+      },
+    },
+  };
+  const blocked = run(project, script).action;
+  assert.match(blocked.reason, /the finisher says it isn't ready/);
+  assert.match(blocked.reason, /\/masna:feedback/);
+
+  // Running again without a fix can't help, and says the same thing.
+  assert.match(run(project, script).action.reason, /the finisher says it isn't ready/);
+  assert.equal(finishes, 1);
+
+  const reply = project.masna(['feedback', '2'], 'Add the missing header to the handler.');
+  assert.match(reply, /saved as job g1-f1/);
+  assert.match(readFileSync(join(project.jobFolder('g1-f1'), 'feedback.md'), 'utf8'), /missing header/);
+
+  const { action } = run(project, script);
+  assert.match(action.reason, /PR #900 is ready for review/);
+  assert.equal(finishes, 2);
+  assert.equal(project.gitHub().prs.length, 1);
+  assert.equal(project.job('g1-f1').stage, 'landed');
+  project.cleanup();
+});
+
+test('feedback on a landed issue is still refused while its group is under way', () => {
+  const project = new Project({ issues: [issue(1), issue(2, { blockedBy: [1] })] });
+  const { action } = run(project, { 2: { builder: () => 'crash' } });
+  assert.equal(action.action, 'crash');
+  const refused = project.masnaRaw(['feedback', '1'], 'Change it.');
+  assert.equal(refused.status, 1);
+  assert.match(refused.stdout, /#1 has landed/);
+  assert.doesNotMatch(refused.stdout, /PR #\?/);
+  project.cleanup();
+});
+
 test('once the group below merges, a stacked group moves onto the base branch', () => {
   const project = new Project({
     milestones,

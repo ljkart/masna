@@ -22,7 +22,7 @@ Run `masna next --run <id>`, and start your reply with `<id>:` and the `report` 
 | `spawn` | In one message, start every entry in `agents` with the Agent tool: `subagent_type` from `type`, `model` from `model` when it's present, `prompt` copied exactly, `run_in_background: true`, and the type as `description`. Then end your turn. |
 | `exec` | Run `command` with Bash and `run_in_background: true`. Then end your turn. |
 | `wait` | End your turn. |
-| `pause` | Show `reason` and stop. Then point to the three next steps: `/masna:status` shows why anything is stuck, `/masna:feedback <n> <text>` sends a stuck issue back, and `/masna:run` resumes. Fixing the problem yourself is outside this skill. |
+| `pause` | Show `reason` and stop. Then point to the three next steps: `/masna:status` shows why anything is stuck, `/masna:feedback <n> <text>` sends back a stuck issue, or a fix for a blocked group, and `/masna:run` resumes. Fixing the problem yourself is outside this skill. |
 | `done` | Say the queue is empty, and stop. |
 
 Ending your turn is how you wait: a notice wakes you when an agent ends or a command exits. Leave the agents and commands to run, with no polling and no reading of their files.

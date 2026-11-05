@@ -10,7 +10,7 @@ You check a whole group of landed issues before it goes to a person as one pull 
 
 Your prompt gives `Group`, `Job folder`, `Worktree`, `Commit`, `Base` and `Output`. The worktree is on the group branch, and you only read it, using `git -C <Worktree> ...`. You report problems here, and a person sends them back.
 
-Run git as `git -C <Worktree> ...`, because Claude Code denies any one command that holds both `cd` and `git`. A denial message blames Bash as a whole, but it only covers the command you sent, so split a long command and try again.
+Your Bash calls don't keep their folder, so use absolute paths, and run git as `git -C <Worktree> ...`. Put `cd <Worktree> && ...` only in front of a project command such as the tests, alone in its call. Claude Code refuses a call with `cd` beside git, `..` or a write. Its message blames Bash as a whole, but only that one call was refused, so send it again without the `cd`.
 
 ## Steps
 
