@@ -16,6 +16,6 @@ test('--version prints the version in the plugin manifest', () => {
 });
 
 test('an unknown command fails', () => {
-  const result = spawnSync(bin, ['next'], { encoding: 'utf8' });
+  const result = spawnSync(bin, ['not-a-command'], { encoding: 'utf8' });
   assert.equal(result.status, 1);
 });

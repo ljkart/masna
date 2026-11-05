@@ -1,0 +1,138 @@
+#!/usr/bin/env node
+// A fake `gh`. It keeps GitHub's state in a JSON file, records every call, and
+// fails any call whose arguments contain a string in `failOn`.
+import { readFileSync, writeFileSync } from 'node:fs';
+
+const statePath = process.env.FAKE_GH_STATE;
+const state = JSON.parse(readFileSync(statePath, 'utf8'));
+const args = process.argv.slice(2);
+
+function stdin() {
+  try {
+    return readFileSync(0, 'utf8');
+  } catch {
+    return '';
+  }
+}
+
+function option(name) {
+  const index = args.indexOf(name);
+  return index >= 0 ? args[index + 1] : undefined;
+}
+
+function textBody() {
+  return option('--body-file') === '-' ? stdin() : option('--body');
+}
+
+function save() {
+  writeFileSync(statePath, JSON.stringify(state, null, 2));
+}
+
+function fail(message) {
+  save();
+  console.error(message);
+  process.exit(1);
+}
+
+function print(value) {
+  save();
+  console.log(typeof value === 'string' ? value : JSON.stringify(value));
+}
+
+function issuePublic(issue) {
+  const { number, title, body, state: issueState, stateReason, milestone, labels, author, comments } = issue;
+  return { number, title, body, state: issueState, stateReason, milestone, labels, author, comments };
+}
+
+function findIssue(number) {
+  const issue = state.issues.find((candidate) => candidate.number === Number(number));
+  if (!issue) fail(`GraphQL: Could not resolve to an issue with the number of ${number}.`);
+  return issue;
+}
+
+state.calls.push(args.filter((arg) => !arg.startsWith('query=')));
+
+const joined = args.join(' ');
+for (const pattern of state.failOn) {
+  if (joined.includes(pattern)) fail(`error connecting to api.github.com (failOn: ${pattern})`);
+}
+
+const [first, second, third] = args;
+
+if (first === 'api' && second === 'graphql') {
+  const number = Number(args.find((arg) => arg.startsWith('number=')).slice('number='.length));
+  const issue = findIssue(number);
+  print({
+    data: {
+      repository: {
+        issue: {
+          lastEditedAt: issue.lastEditedAt ?? null,
+          editor: issue.editor ? { login: issue.editor } : null,
+          timelineItems: {
+            nodes: [
+              ...issue.labels.map((label) => ({ createdAt: issue.labeledAt, label })),
+              ...(issue.renames ?? []),
+            ],
+          },
+        },
+      },
+    },
+  });
+} else if (first === 'api' && second.includes('/milestones')) {
+  print(state.milestones);
+} else if (first === 'api' && second.includes('/collaborators/')) {
+  const login = second.split('/collaborators/')[1].split('/')[0];
+  print({ permission: state.writers.includes(login) ? 'write' : 'read' });
+} else if (first === 'issue' && second === 'list') {
+  const label = option('--label');
+  print(state.issues
+    .filter((issue) => issue.state === 'OPEN' && issue.labels.some((candidate) => candidate.name === label))
+    .map(issuePublic));
+} else if (first === 'issue' && second === 'view') {
+  print(issuePublic(findIssue(third)));
+} else if (first === 'issue' && second === 'close') {
+  const issue = findIssue(third);
+  issue.state = 'CLOSED';
+  issue.stateReason = 'COMPLETED';
+  print('closed');
+} else if (first === 'issue' && second === 'comment') {
+  const issue = findIssue(third);
+  issue.comments.push({ author: { login: state.operator }, createdAt: new Date().toISOString(), body: textBody() });
+  print('commented');
+} else if (first === 'issue' && second === 'edit') {
+  const issue = findIssue(third);
+  const add = option('--add-label');
+  const remove = option('--remove-label');
+  if (add && !issue.labels.some((label) => label.name === add)) issue.labels.push({ name: add });
+  if (remove) issue.labels = issue.labels.filter((label) => label.name !== remove);
+  print('edited');
+} else if (first === 'pr' && second === 'list') {
+  const headBranch = option('--head');
+  print(state.prs.filter((pr) => pr.headRefName === headBranch));
+} else if (first === 'pr' && second === 'view') {
+  const pr = state.prs.find((candidate) => candidate.number === Number(third));
+  if (!pr) fail('no pull requests found');
+  print(pr);
+} else if (first === 'pr' && second === 'create') {
+  const number = state.nextNumber;
+  state.nextNumber += 1;
+  const url = `https://github.com/acme/app/pull/${number}`;
+  state.prs.push({
+    number,
+    url,
+    state: 'OPEN',
+    baseRefName: option('--base'),
+    headRefName: option('--head'),
+    title: option('--title'),
+    body: textBody(),
+  });
+  print(url);
+} else if (first === 'pr' && second === 'edit') {
+  const pr = state.prs.find((candidate) => candidate.number === Number(third));
+  if (option('--base')) pr.baseRefName = option('--base');
+  if (option('--title')) pr.title = option('--title');
+  if (option('--body-file') === '-') pr.body = stdin();
+  print('edited');
+} else {
+  fail(`fake gh doesn't know: ${joined}`);
+}

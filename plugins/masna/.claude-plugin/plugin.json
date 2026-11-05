@@ -1,6 +1,6 @@
 {
   "name": "masna",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Turns a queue of GitHub issues into reviewed code.",
   "author": { "name": "Liju Kunnummal" },
   "repository": "https://github.com/ljkart/masna",

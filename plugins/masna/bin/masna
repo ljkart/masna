@@ -1,14 +1,114 @@
 #!/usr/bin/env node
 import { readFileSync } from 'node:fs';
+import { parseArgs } from 'node:util';
 
-const manifestUrl = new URL('../.claude-plugin/plugin.json', import.meta.url);
-const { version } = JSON.parse(readFileSync(manifestUrl, 'utf8'));
+const library = (name) => import(new URL(`../lib/${name}.mjs`, import.meta.url));
 
-const command = process.argv[2];
+function readStdin() {
+  try {
+    return readFileSync(0, 'utf8');
+  } catch {
+    return '';
+  }
+}
+
+// The guard fails closed: a hook that crashes with an ordinary error doesn't block
+// the tool call, so every error, even a broken install, has to become exit 2.
+async function guard() {
+  try {
+    const { guardHook } = await library('guard');
+    const decision = guardHook(JSON.parse(readStdin()));
+    if (decision.allow) return;
+    console.error(`Blocked by Masna: ${decision.reason}`);
+  } catch (error) {
+    console.error(`Blocked by Masna: the guard failed: ${error.message}`);
+  }
+  process.exit(2);
+}
+
+// Recording an agent's start or end must never disturb the agent.
+async function recordAgent(kind) {
+  try {
+    const hooks = await library('hooks');
+    hooks.recordAgent(JSON.parse(readStdin()), kind);
+  } catch {
+    // Deliberately ignored: see above.
+  }
+}
+
+const print = (value) => console.log(JSON.stringify(value));
+
+async function root() {
+  const { findRoot } = await library('project');
+  return findRoot();
+}
+
+const commands = {
+  async begin(args) {
+    const { values } = parseArgs({ args, options: { takeover: { type: 'boolean' } } });
+    const { beginRun } = await library('run');
+    print(beginRun(await root(), { takeover: values.takeover }));
+  },
+
+  async next(args) {
+    const { values } = parseArgs({ args, options: { run: { type: 'string' }, failed: { type: 'string' } } });
+    if (!values.run) throw new Error('masna next needs --run <id>');
+    const { next } = await library('next');
+    print(await next(await root(), values));
+  },
+
+  async gate(args) {
+    const { values } = parseArgs({
+      args,
+      options: {
+        job: { type: 'string' },
+        group: { type: 'string' },
+        run: { type: 'string' },
+        setup: { type: 'boolean' },
+        baseline: { type: 'boolean' },
+      },
+    });
+    if (!values.run || (!values.job && !values.group)) {
+      throw new Error('masna gate needs --run <id> and --job <id> or --group <n>');
+    }
+    const { runGate } = await library('gate');
+    console.log(await runGate(await root(), values));
+  },
+
+  async status(args) {
+    const { values } = parseArgs({ args, options: { json: { type: 'boolean' } } });
+    const { buildView, renderStatus } = await library('view');
+    const view = buildView(await root());
+    console.log(values.json ? JSON.stringify(view, null, 2) : renderStatus(view));
+  },
+
+  async feedback(args) {
+    const { positionals } = parseArgs({ args, allowPositionals: true });
+    if (!positionals[0]) throw new Error('masna feedback needs an issue or PR number, or a job id');
+    const { giveFeedback } = await library('feedback');
+    const result = giveFeedback(await root(), positionals[0], readStdin());
+    console.log(result.message);
+    if (!result.ok) process.exitCode = 1;
+  },
+
+  guard,
+  'agent-started': () => recordAgent('started'),
+  'agent-ended': () => recordAgent('ended'),
+};
+
+const [command, ...args] = process.argv.slice(2);
 
 if (command === '--version') {
-  console.log(version);
+  const manifest = new URL('../.claude-plugin/plugin.json', import.meta.url);
+  console.log(JSON.parse(readFileSync(manifest, 'utf8')).version);
+} else if (commands[command]) {
+  try {
+    await commands[command](args);
+  } catch (error) {
+    console.error(`masna ${command}: ${error.message}`);
+    process.exitCode = 1;
+  }
 } else {
-  console.error(`masna ${version}: the engine isn't built yet`);
+  console.error(`masna: unknown command "${command ?? ''}"`);
   process.exitCode = 1;
 }

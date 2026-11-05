@@ -6,7 +6,7 @@ This plan stands on its own, so a new session can build from it without other co
 
 - **Repo:** `ljkart/masna`, public
 - **Licence:** MIT
-- **Status:** M0 in progress; the engine isn't built
+- **Status:** M0 and M1 are built; the agents and skills (M2) are next
 
 ## 1. Goals
 
@@ -190,7 +190,7 @@ The current milestone is the first open one with queued issues, ordered by due d
 
 Issues in a milestone are the only ones eligible, so a labelled parent PRD outside any milestone is never picked up. These go to `needs-human`, with the reason:
 
-- An issue that can't be parsed
+- An issue that can't be parsed: it needs a non-empty `## Acceptance criteria` section, and any `## Blocked by` section must list `#<n>` references or start with "None"
 - A blocker closed as not planned
 - A blocker that's still open and outside the queue, which would otherwise wait forever
 - A dependency cycle
@@ -235,7 +235,7 @@ Claude Code's sandbox stops commands listening on localhost, which also affects 
 
 ### Public output is minimal
 
-Many adopters will have public repos, and a security finding posted to an issue is a public disclosure. GitHub comments carry verdicts, commit and criteria only. **Findings, logs and agent text stay in `.masna/jobs/`.** Group PR bodies are limited in the same way.
+Many adopters will have public repos, and a security finding posted to an issue is a public disclosure. GitHub comments carry verdicts, commit and criteria only. **Findings, logs and agent text stay in `.masna/jobs/`.** Group PR bodies are limited in the same way: the engine writes them, so no agent text can reach them.
 
 ### The dashboard only reads
 
@@ -403,7 +403,7 @@ The engine uses Node 22+ with no npm dependencies, and tests use `node --test`. 
 |---|---|
 | `masna begin [--takeover]` | Starts a run and returns its id, or refuses if another run is active |
 | `masna next --run <id> [--failed <type>]` | Advances what scripts can, then returns the next action as JSON |
-| `masna gate --job <id> --run <id>` | Runs setup and checks, and writes `checks.md`; `--baseline` checks a new group branch |
+| `masna gate --job <id> --run <id>` | Runs setup and checks, and writes `checks.md`; `--setup` only prepares the worktree; `--group <n>` checks a whole group, with `--baseline` for a new one |
 | `masna status [--json]` | Table of groups and issues; a stuck issue shows why |
 | `masna dashboard [--port <n>] [--stop]` | Starts the detached dashboard server and prints its URL, or stops it |
 | `masna feedback <n>` | Saves feedback from stdin and reopens the job, or creates one for a group PR |
@@ -426,7 +426,7 @@ Every agent writes one file, replies with one line, and reads the project's `CLA
 | `reviewer-ui` | sonnet | `review-ui.md` | Visual consistency, overflow, contrast, using the preview |
 | `reviewer-ux` | sonnet | `review-ux.md` | Whether the flow works for its users, errors and empty states |
 | `approver` | opus | `decision.md` | Spot-checks criteria, stops for business decisions |
-| `finisher` | sonnet | `group.md` | End-of-group checklist and PR text |
+| `finisher` | sonnet | `group.md` | Whole-group review and end-of-group checklist |
 
 Reviewer output format, with `CHANGES` only for blocking problems in this change:
 
