@@ -1,0 +1,18 @@
+#!/usr/bin/env node
+// Stands in for `masna dashboard`: starts a detached local server, records its
+// port and process id, then returns at once. It shuts itself down after a while.
+import { spawn } from 'node:child_process';
+
+const server = `
+  const http = require('node:http');
+  const fs = require('node:fs');
+  const s = http.createServer((_, res) => res.end('probe-serve-ok'));
+  s.on('error', (e) => { fs.writeFileSync('serve-error.txt', String(e)); process.exit(1); });
+  s.listen(0, '127.0.0.1', () => {
+    fs.writeFileSync('serve.json', JSON.stringify({ port: s.address().port, pid: process.pid }));
+  });
+  setTimeout(() => process.exit(0), 120000);
+`;
+
+spawn(process.execPath, ['-e', server], { detached: true, stdio: 'ignore' }).unref();
+console.log('started');

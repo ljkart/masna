@@ -6,7 +6,7 @@ This plan stands on its own, so a new session can build from it without other co
 
 - **Repo:** `ljkart/masna`, public
 - **Licence:** MIT
-- **Status:** planned; the repo exists with only a licence, nothing built
+- **Status:** M0 in progress; the engine isn't built
 
 ## 1. Goals
 
@@ -113,7 +113,9 @@ A resumed session may keep its id even though its agents are gone, so a session 
 
 `begin` refuses to start if another run has a heartbeat from the last 15 minutes, unless given `--takeover`. Engine commands and guard calls refresh the heartbeat. `next` refuses a run id that isn't the current one, so a replaced orchestrator can't keep acting.
 
-A plugin `SubagentStop` hook records that an agent ended. Builds are serial and each agent type runs once per job, so the agent type and the active job identify the output file. `next` then decides:
+A plugin `SubagentStop` hook records that an agent ended. Builds are serial and each agent type runs once per job, so the agent type and the active job identify the output file.
+
+That hook doesn't fire for an agent that dies on an API failure (spike S7). The orchestrator is still told, so when a notice says an agent failed, it runs `masna next --run <id> --failed <type>`. It passes only the agent's type and doesn't read its output. `next` then decides:
 
 | Agent's state | Result |
 |---|---|
@@ -125,7 +127,7 @@ A plugin `SubagentStop` hook records that an agent ended. Builds are serial and 
 
 ### Outages pause the run; they don't blame the issue
 
-If usage limits or an API outage killed agents, the retry rule above would mark every issue in the queue as stuck. So two agents in a row ending without valid output produce `pause`, leave the job where it is and don't use up its retry. Failed `git` or `gh` network calls also produce `pause`. Only problems with the work move a job to `needs-human`.
+If usage limits or an API outage killed agents, the retry rule above would mark every issue in the queue as stuck. So two agents in a row ending without valid output produce `pause`, leave the job where it is and don't use up its retry. An agent reported through `--failed` never uses up a job's retry. Failed `git` or `gh` network calls also produce `pause`. Only problems with the work move a job to `needs-human`.
 
 ### Stages and evidence
 
@@ -229,6 +231,8 @@ An earlier issue may have changed dependencies, so `setup.sh` runs at the start 
 
 If `.masna/preview.sh` exists, the engine starts it once per review round on a free port, passes the URL to UI and UX reviewers, and stops it afterwards. Without it, those reviewers read code only and must say the screens weren't checked.
 
+Claude Code's sandbox stops commands listening on localhost, which also affects previews and any tests that start a server. `doctor` warns when sandboxing is on and the project has a `preview.sh`. A preview that can't start counts as no preview, so reviewers must say the screens weren't checked. M4 settles the recommended sandbox settings for these projects.
+
 ### Public output is minimal
 
 Many adopters will have public repos, and a security finding posted to an issue is a public disclosure. GitHub comments carry verdicts, commit and criteria only. **Findings, logs and agent text stay in `.masna/jobs/`.** Group PR bodies are limited in the same way.
@@ -261,6 +265,8 @@ Selecting an issue shows its verdicts, findings and the end of its checks log. O
 - `lib/view.mjs`: one function turns these files into the view. `masna status` prints it, `masna status --json` returns it, and the dashboard serves it, so the three can't disagree.
 
 **How it stays live.** `masna dashboard` starts a detached Node server using only `node:http`, records its port and process id in `.masna/dashboard.json`, and returns the URL. Every second it checks the size of the event log, and when it grows, it rebuilds the view and pushes it to the browser through server-sent events. The page is one static HTML file, with no build step or dependencies. Polling one file behaves the same on every OS, unlike recursive file watching.
+
+**Under sandboxing.** Claude Code's sandbox stops a command from listening on localhost (spike S10). `masna dashboard` detects that failure and prints the full command for the person to run in their own terminal, where `masna` isn't on the `PATH`.
 
 **What keeps it from affecting the run:**
 
@@ -308,7 +314,7 @@ Plugin agents ignore `hooks` and `permissionMode` in their frontmatter, so the g
 | Builder | Writing to `protected_paths`, or outside its worktree and `build.md` |
 | Reviewers, approver, finisher | Writing anything except their own output file |
 
-Agents also get a `tools` list in their frontmatter, so reviewers have no `Edit` tool.
+Agents also get a `tools` list in their frontmatter, so reviewers have no `Edit` tool. Without one, a background agent gets `Agent`, `SendMessage`, `WebFetch` and `WebSearch` too (spike S3), and a builder misled by issue text could use those to send data out.
 
 ### Be honest about the limits
 
@@ -320,7 +326,9 @@ The guard is a safety net, not a sandbox. A determined script can get around pat
 
 ### Permissions for unattended runs
 
-A prompt nobody answers stops the run, so the recommended mode is `claude --permission-mode dontAsk`, plus allow rules that `/masna:init` proposes in `.claude/settings.json`. Anything not allowed is denied, not left hanging, and the agent reports it. `bypassPermissions` is never recommended. Spike S3 confirms this works.
+A prompt nobody answers stops the run, so the recommended mode is `claude --permission-mode dontAsk`, plus allow rules that `/masna:init` proposes in `.claude/settings.json`. Anything not allowed is denied, not left hanging, and the agent reports it. `bypassPermissions` is never recommended. Spike S3 confirmed this works.
+
+Claude Code ignores a project's allow rules until that folder has been trusted, and then denies everything under `dontAsk`. Running `/masna:init` interactively first takes care of this. `doctor` checks that the folder is trusted, because a fresh clone would otherwise fail on every tool call.
 
 ## 8. Layout
 
@@ -394,7 +402,7 @@ The engine uses Node 22+ with no npm dependencies, and tests use `node --test`. 
 | Command | Does |
 |---|---|
 | `masna begin [--takeover]` | Starts a run and returns its id, or refuses if another run is active |
-| `masna next --run <id>` | Advances what scripts can, then returns the next action as JSON |
+| `masna next --run <id> [--failed <type>]` | Advances what scripts can, then returns the next action as JSON |
 | `masna gate --job <id> --run <id>` | Runs setup and checks, and writes `checks.md`; `--baseline` checks a new group branch |
 | `masna status [--json]` | Table of groups and issues; a stuck issue shows why |
 | `masna dashboard [--port <n>] [--stop]` | Starts the detached dashboard server and prints its URL, or stops it |
@@ -466,7 +474,9 @@ Add a README stub, CI, and an empty plugin that validates and installs. Then set
 
 S5 (a usable session id for skills) is dropped, because run ids replace it. The docs pages reviewed show no session id in Bash or skills.
 
-**Exit:** install works from GitHub on a clean project, and each spike has a recorded answer in `docs/DESIGN.md`.
+S6 needs a real orchestrator, so it moves to M2. Answers and evidence for the others are in `docs/DESIGN.md`, and `test/spikes/run.sh` repeats them.
+
+**Exit:** install works from GitHub on a clean project, and each spike except S6 has a recorded answer in `docs/DESIGN.md`.
 
 ### M1: Engine, no models
 
@@ -478,7 +488,7 @@ Build the queue, state, runs, gate, routing, landing, group branches, guard, eve
 
 Write the agents, plus `/masna:run`, `status`, `feedback`, then run on the sandbox repo.
 
-**Exit:** a real run finishes three dependent sandbox issues, with one forced fix round, and opens a correct group PR with no help. Interrupting and resuming it loses nothing.
+**Exit:** a real interactive run finishes three dependent sandbox issues, with one forced fix round, and opens a correct group PR with no help. Interrupting and resuming it loses nothing. The run forces a compaction, and that answers S6. The M0 spikes ran under `claude -p`, so this run also confirms S3 and S8 in an interactive session.
 
 ### M3: Dashboard
 

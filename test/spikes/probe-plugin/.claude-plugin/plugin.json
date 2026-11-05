@@ -1,0 +1,5 @@
+{
+  "name": "probe",
+  "version": "0.0.0",
+  "description": "Tests Claude Code behaviour that Masna depends on. Not for installing."
+}

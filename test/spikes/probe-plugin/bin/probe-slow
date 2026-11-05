@@ -1,0 +1,4 @@
+#!/bin/sh
+# Stands in for a slow gate: takes a while, then leaves evidence in the project.
+sleep 20
+date -u +%Y-%m-%dT%H:%M:%SZ > slow-finished.txt
