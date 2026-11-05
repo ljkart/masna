@@ -119,7 +119,11 @@ try {
   console.log('PASS');
 } finally {
   const quiet = (...args) => spawnSync('gh', args, { cwd: root, stdio: 'ignore' });
-  if (created.pr) quiet('pr', 'close', String(created.pr), '--delete-branch');
+  if (created.pr) quiet('pr', 'close', String(created.pr));
+  // Deleted directly: gh can't delete a branch that a local worktree has checked out.
+  if (created.milestone) {
+    spawnSync('git', ['push', '--quiet', 'origin', '--delete', `masna/group/${created.milestone}-smoke-test`], { cwd: root, stdio: 'ignore' });
+  }
   for (const number of created.issues) quiet('issue', 'close', String(number), '--reason', 'not planned');
   if (created.milestone) quiet('api', '-X', 'DELETE', `repos/{owner}/{repo}/milestones/${created.milestone}`);
   rmSync(dir, { recursive: true, force: true });
