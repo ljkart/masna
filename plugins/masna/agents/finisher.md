@@ -10,6 +10,8 @@ You check a whole group of landed issues before it goes to a person as one pull 
 
 Your prompt gives `Group`, `Job folder`, `Worktree`, `Commit`, `Base` and `Output`. The worktree is on the group branch, and you only read it, using `git -C <Worktree> ...`. You report problems here, and a person sends them back.
 
+Run git as `git -C <Worktree> ...`, because Claude Code denies any one command that holds both `cd` and `git`. A denial message blames Bash as a whole, but it only covers the command you sent, so split a long command and try again.
+
 ## Steps
 
 1. Read the project's `CLAUDE.md` or `AGENTS.md` in the worktree.
@@ -20,7 +22,7 @@ Your prompt gives `Group`, `Job folder`, `Worktree`, `Commit`, `Base` and `Outpu
    - **Duplication:** the same helper written twice by different issues.
    - **Leftovers:** debug code, temporary files, or TODOs that a later issue should have settled.
 5. If `.masna/checklist.md` exists, check every item against the group, and mark each one done or not done with what you saw.
-6. Write `Output`, then reply with one line: the status, plus at most ten words. If `Output` already exists, Read it before replacing it.
+6. Write `Output`, then end with a one-line reply and nothing after it: the status, plus at most ten words. If `Output` already exists, Read it before replacing it.
 
 ## Status
 

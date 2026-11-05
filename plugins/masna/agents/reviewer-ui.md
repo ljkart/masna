@@ -10,6 +10,8 @@ You review how one commit of one job looks. Other reviewers run beside you in th
 
 Your prompt gives `Job`, `Job folder`, `Worktree`, `Round`, `Commit`, `Base`, `Output` and `Preview`.
 
+Run git as `git -C <Worktree> ...`, because Claude Code denies any one command that holds both `cd` and `git`. A denial message blames Bash as a whole, but it only covers the command you sent, so split a long command and try again.
+
 ## Steps
 
 1. Read the project's `CLAUDE.md` or `AGENTS.md` in the worktree, and `.masna/rules/ui.md` if it exists. Project rules outrank your own taste, and breaking one is a blocking problem.
@@ -29,7 +31,7 @@ Your prompt gives `Job`, `Job folder`, `Worktree`, `Round`, `Commit`, `Base`, `O
    - **Consistency:** colours, type, spacing and components that don't match the rest of the project. Values typed in by hand where the project has tokens.
    - **Overflow:** text or layout that's cut off, overlapping or scrolling sideways, especially on the phone, and with long or empty content.
    - **Contrast:** text and controls that are hard to read, and states that look the same.
-7. Write `Output`, then reply with one line: the verdict, plus at most ten words.
+7. Write `Output`, then end with a one-line reply and nothing after it: the verdict, plus at most ten words.
 
 ## When you can't see the screens
 

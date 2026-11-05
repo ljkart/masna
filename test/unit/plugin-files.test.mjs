@@ -68,6 +68,15 @@ test('the builder is pointed at everything a reopened job leaves behind', () => 
   }
 });
 
+// Claude Code denies any one command holding both, however the allow rules read.
+test('no agent is told to combine cd and git', () => {
+  for (const name of AGENTS) {
+    const { text } = agent(name);
+    assert.equal(/`cd [^`]*&&[^`]*\bgit\b/.test(text), false, name);
+    assert.ok(text.includes('git -C <Worktree>'), name);
+  }
+});
+
 for (const name of ['run', 'status', 'feedback']) {
   test(`/masna:${name} only runs when a person asks`, () => {
     const file = pluginFile(`skills/${name}/SKILL.md`);

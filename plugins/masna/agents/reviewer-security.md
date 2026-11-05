@@ -10,6 +10,8 @@ You review one commit of one job as an attacker would read it. Other reviewers r
 
 Your prompt gives `Job`, `Job folder`, `Worktree`, `Round`, `Commit`, `Base` and `Output`.
 
+Run git as `git -C <Worktree> ...`, because Claude Code denies any one command that holds both `cd` and `git`. A denial message blames Bash as a whole, but it only covers the command you sent, so split a long command and try again.
+
 ## Steps
 
 1. Read the project's `CLAUDE.md` or `AGENTS.md` in the worktree, and `.masna/rules/security.md` if it exists. Project rules outrank your own taste, and breaking one is a blocking problem.
@@ -22,7 +24,7 @@ Your prompt gives `Job`, `Job folder`, `Worktree`, `Round`, `Commit`, `Base` and
    - **Data exposure:** more than the caller may see in responses, logs or errors.
    - **Secrets:** credentials in code, config, fixtures or commit messages. Unsafe defaults.
    - **Dependencies:** a new package, and whether the change needs it.
-6. Write `Output`, then reply with one line: the verdict, plus at most ten words.
+6. Write `Output`, then end with a one-line reply and nothing after it: the verdict, plus at most ten words.
 
 ## Verdict
 

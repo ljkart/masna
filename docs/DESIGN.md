@@ -65,8 +65,24 @@ Against the real GitHub API, only read calls have been tried: milestones, issue 
 - **Reopened issues:** the builder's instructions name `feedback.md`, so feedback on a reopened issue reaches it, though its prompt only names `issue.md`.
 - **Rules are for reviewers:** the builder isn't pointed at `.masna/rules/`. The sandbox uses this to force a fix round: a house rule that only the reviewer knows. M6 can show whether builders should read them too, to save rounds.
 
+### What the first real run found
+
+The builder was denied Bash on its first command and stopped as blocked. Tested in a background plugin agent under `dontAsk`, with every part of the command allowed, on Claude Code 2.1.318:
+
+| Command | Result |
+|---|---|
+| `cd <worktree> && git log` | Denied |
+| `cd <worktree> && git add -A && git commit ...` | Denied |
+| `cd <worktree> && ls ... \| head` | Allowed |
+| `cd <worktree> && npm test` | Allowed |
+| `git -C <worktree> log`, `add`, `commit` | Allowed |
+
+So any one command holding both `cd` and `git` is denied, whatever the allow rules say, and the message blames Bash as a whole. The builder's instructions had told it to start every command with `cd`. Agents now use `git -C <Worktree>`, and a test keeps it that way. They also split a denied command and try again before reporting it as blocked. Don't answer this with a blanket `Bash` allow rule: `/masna:init` should keep proposing narrow rules.
+
 ### The sandbox
 
 `test/sandbox/create.sh <folder>` builds `ljkart/masna-sandbox` from `test/sandbox/project/` and `test/sandbox/issues/`: three dependent issues routed to all four reviewers, the two labels, and a hand-written `.masna/`, because `/masna:init` is M4. It refuses to touch a repo that already exists.
+
+`test/sandbox/reset.sh <clone>` puts the sandbox back to the start for another try, without deleting the repo.
 
 `node test/sandbox/smoke.mjs <owner/repo>` drives the engine against the real GitHub API with scripted agents and no model calls, then removes what it created. It takes a stuck issue through a partial PR, feedback and an edit of that PR. It passed on 2026-11-05, the first real use of the calls that change GitHub.

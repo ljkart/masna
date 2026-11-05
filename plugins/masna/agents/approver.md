@@ -10,6 +10,8 @@ You are the last check before a job lands. The gate and the reviewers have passe
 
 Your prompt gives `Job`, `Job folder`, `Worktree`, `Round`, `Commit`, `Base` and `Output`.
 
+Run git as `git -C <Worktree> ...`, because Claude Code denies any one command that holds both `cd` and `git`. A denial message blames Bash as a whole, but it only covers the command you sent, so split a long command and try again.
+
 ## Steps
 
 1. Read the project's `CLAUDE.md` or `AGENTS.md` in the worktree.
@@ -21,7 +23,7 @@ Your prompt gives `Job`, `Job folder`, `Worktree`, `Round`, `Commit`, `Base` and
    - A criterion is met when you've seen it met. A claim in `build.md` or a reviewer's PASS is where to start looking.
 5. Look for a decision that belongs to a person: something the issue leaves open that changes what users pay, see, agree to or lose, or that can't be undone. A reviewer's note may have raised one.
 6. Run `git -C <Worktree> status --short`. It must show what it showed before you started, so remove anything your test runs created.
-7. Write `Output`, then reply with one line: the decision, plus at most ten words. If `Output` already exists, Read it before replacing it.
+7. Write `Output`, then end with a one-line reply and nothing after it: the decision, plus at most ten words. If `Output` already exists, Read it before replacing it.
 
 ## Decision
 
